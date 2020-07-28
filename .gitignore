@@ -1,3 +1,5 @@
 *.osm
 *.zip
-
+Building_Footprints-shp/*
+.DS_Store
+wikipage.txt
