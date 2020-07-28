@@ -291,21 +291,23 @@ if ($inHandle === false) {
     help();
 }
 
-if ($outName != '') {
-    $outHandle = fopen($outName, 'w');
-    if ($outHandle === false) {
-        fclose($inHandle);
-        fprintf(STDERR, "Error: Unable to create '%s' for output." . PHP_EOL, $outName);
-        help();
-    }
-}
-
 scan1($inHandle);
 fprintf(STDERR,"Nodes %d of %d".PHP_EOL, $requiredNodes, $totalNodes);
 fprintf(STDERR,"Boundary for dataset: %s,%s %s,%s".PHP_EOL, $minLon, $minLat, $maxLon, $maxLat);
 
-fseek($inHandle,0);
-scan2($inHandle, $outHandle);
+if (sizeof($requiredIDs) > 0) {
+    if ($outName != '') {
+        $outHandle = fopen($outName, 'w');
+        if ($outHandle === false) {
+            fclose($inHandle);
+            fprintf(STDERR, "Error: Unable to create '%s' for output." . PHP_EOL, $outName);
+            help();
+        }
+    }
+    fseek($inHandle,0);
+    scan2($inHandle, $outHandle);
+}
+
 fclose($inHandle);
 fclose($outHandle);
 
