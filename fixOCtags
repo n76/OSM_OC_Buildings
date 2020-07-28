@@ -1,0 +1,243 @@
+#! /usr/bin/php
+<?php
+
+define('ATTRIBUTION', 'Orange County Open Data Portal');
+
+
+$abbrev = array(
+            // Prefixes
+            '/^N (.*)/i',
+            '/^S (.*)/i',
+            '/^E (.*)/i',
+            '/^W (.*)/i',
+
+            '/^Ave (.*)/i',
+            '/^Avnda (.*)/i',
+            '/^Cam (.*)/i',
+            '/^Camta (.*)/i',
+            '/^Camto (.*)/i',
+            '/^Cte (.*)/i',
+            '/^Mt (.*)/i',
+            '/^Mtn (.*)/i',
+            '/^St (.*)/i',
+
+            // In the middle of the name
+            '/^(.*) De (.*)$/',
+            '/^(.*) Del (.*)$/',
+            '/^(.*) Du (.*)$/',
+            '/^(.*) El (.*)$/',
+            '/^(.*) Hwy (.*)$/',
+            '/^(.*) La (.*)$/',
+            '/^(.*) Mtn (.*)$/',
+            '/^(.*) Of (.*)$/',
+            '/^(.*) St (.*)$/',
+
+            // Suffixes
+            '/(.*) Av$/i',
+            '/(.*) Ave$/i',
+            '/(.*) Bl$/i',
+            '/(.*) Blvd$/i',
+            '/(.*) Ci$/i',
+            '/(.*) Cr$/i',
+            '/(.*) Ct$/i',
+            '/(.*) Cv$/i',
+            '/(.*) Cy$/i',
+            '/(.*) Dr$/i',
+            '/(.*) Gl$/i',
+            '/(.*) Gln$/i',
+            '/(.*) Gr$/i',
+            '/(.*) Hw$/i',
+            '/(.*) Hwy$/i',
+            '/(.*) Hy$/i',
+            '/(.*) La$/i',
+            '/(.*) Ln$/i',
+            '/(.*) Lo$/i',
+            '/(.*) Lp$/i',
+            '/(.*) Pa$/i',
+            '/(.*) Pk$/i',
+            '/(.*) Pkwy$/i',
+            '/(.*) Pl$/i',
+            '/(.*) Pt$/i',
+            '/(.*) Py$/i',
+            '/(.*) Rd$/i',
+            '/(.*) Ro$/i',
+            '/(.*) Rw$/i',
+            '/(.*) Sq$/i',
+            '/(.*) St$/i',
+            '/(.*) St\.$/i',
+            '/(.*) Te$/i',
+            '/(.*) Ter$/i',
+            '/(.*) Tl$/i',
+            '/(.*) Tr$/i',
+            '/(.*) Tt$/i',
+            '/(.*) Vw$/i',
+            '/(.*) Wa$/i',
+            '/(.*) Wl$/i',
+            '/(.*) Wk$/i',
+            '/(.*) Wy$/i',
+            '/(.*) Xi$/i',
+
+            // Special cases
+            '/(.*) el Camino Real$/i',
+            '/^East Avenue$/i',
+            '/^East Street$/i',
+          );
+
+$expanded = array(
+            // Prefixes
+            'North ${1}',           // N
+            'South ${1}',           // S
+            'East ${1}',            // E (be careful of "E Street")
+            'West ${1}',            // W
+
+            'Avenida ${1}',         // Ave
+            'Avenida ${1}',         // Avnda
+            'Camino ${1}',          // Cam
+            'Caminita ${1}',        // Camta
+            'Caminito ${1}',        // Camto
+            'Corte ${1}',           // Cte
+            'Mount ${1}',           // Mt
+            'Mountain ${1}',        // Mtn
+            'Saint ${1}',           // St
+
+            // Word in the middle of the name
+            '${1} de ${2}',         // De
+            '${1} del ${2}',        // Del
+            '${1} du ${2}',         // Du
+            '${1} el ${2}',         // El
+            '${1} Highway ${2}',    // Hwy
+            '${1} la ${2}',         // La
+            '${1} Mountain ${2}',   // Mtn
+            '${1} of ${2}',         // Of
+            '${1} Saint ${2}',      // St
+
+            // Suffixes
+            '${1} Avenue',          // Av
+            '${1} Avenue',          // Ave
+            '${1} Boulevard',       // Bl
+            '${1} Boulevard',       // Blvd
+            '${1} Circle',          // Ci
+            '${1} Circle',          // Cr
+            '${1} Court',           // Ct
+            '${1} Cove',            // Cv
+            '${1} Canyon',          // Cy
+            '${1} Drive',           // Dr
+            '${1} Glen',            // Gl
+            '${1} Glen',            // Gln
+            '${1} Grade',           // Gr Grade or Grove
+            '${1} Highway',         // Hw
+            '${1} Highway',         // Hwy
+            '${1} Highway',         // Hy
+            '${1} Lane',            // La
+            '${1} Lane',            // Ln
+            '${1} Loop',            // Lo
+            '${1} Loop',            // Lp
+            '${1} Pass',            // Pa
+            '${1} Parkway',         // Pk
+            '${1} Parkway',         // Pkwy
+            '${1} Place',           // Pl
+            '${1} Point',           // Pt
+            '${1} Parkway',         // Py
+            '${1} Road',            // Rd
+            '${1} Row',             // Ro
+            '${1} Row',             // Rw
+            '${1} Square',          // Sq
+            '${1} Street',          // St
+            '${1} Street',          // St.
+            '${1} Terrace',         // Te
+            '${1} Terrace',         // Ter
+            '${1} Trail',           // Tl
+            '${1} Terrace',         // Tr Terrace or Trail
+            '${1} Truck Trail',     // Tt
+            '${1} View',            // Vw
+            '${1} Way',             // Wa
+            '${1} Walk',            // Wl
+            '${1} Walk',            // Wk
+            '${1} Way',             // Wy
+            '${1} Crossing',        // Xi
+
+            // Special cases
+            '${1} El Camino Real',
+            'E Avenue',
+            'E Street',
+          );
+
+function fixTags($tags) {
+    global $abbrev, $expanded;
+
+    $fixed = array();
+
+    $fixed['building'] = 'yes';
+    //$fixed['source:building'] = ATTRIBUTION;
+
+    foreach ($tags as $key => $val) {
+        switch ($key) {
+            case 'ABS_HT':
+                //$fixed['ele'] = ($val+0.0)*0.3048;
+                //$fixed['source:ele'] = ATTRIBUTION;
+            break;
+
+            case 'Address':
+                $parts = explode(' ',$val);
+                if (is_numeric($parts[0])) {
+                    $fixed['addr:housenumber'] = $parts[0];
+                    unset($parts[0]);
+                    $street = ucwords(strtolower(implode(' ', $parts)));
+                    $newVal = preg_replace($abbrev, $expanded, $street);
+                    $fixed['addr:street'] = $newVal;
+                    //$fixed['source:addr:housenumber'] = ATTRIBUTION;
+                    //$fixed['source:addr:street'] = ATTRIBUTION;
+                }
+            break;
+
+            case 'City':
+                $fixed['addr:city'] = ucwords(strtolower($val));
+                //$fixed['source:addr:city'] = ATTRIBUTION;
+            break;
+
+            case 'Height':
+                $fixed['height'] = round(($val+0.0)*0.3048,2);
+                //$fixed['source:height'] = ATTRIBUTION;
+            break;
+
+            case 'Zipcode':
+                $fixed['addr:postcode'] = $val;
+                //$fixed['source:addr:postcode'] = ATTRIBUTION;
+            break;
+
+            default:
+                // printf('%s -> "%s"'.PHP_EOL, $key, $val);
+            break;
+        }
+    }
+    ksort($fixed);
+    return $fixed;
+}
+
+$tags = array();
+$line = fgets(STDIN);
+while ($line !== false) {
+    $line = trim($line);
+    if (stripos($line,'<way ') !== false) {
+        $tags = array();        // Reset object tags
+    } else if (stripos($line,'<tag ') !== false) {
+        $x = strtok($line, "'");
+        $key = strtok("'");
+        $x = strtok("'");
+        $val = strtok("'");
+        $tags[$key] = $val;
+        $line = '';
+    } else if (stripos($line,'</way>') !== false) {
+        $fixed = fixTags($tags);
+        foreach ($fixed as $k => $v) {
+            printf("<tag k='%s' v='%s' />" . PHP_EOL, $k, $v);
+        }
+        $tags = array();
+    }
+    if (strlen($line) > 0) {
+        printf("%s".PHP_EOL, $line);
+    }
+    $line = fgets(STDIN);
+}
+
+?>

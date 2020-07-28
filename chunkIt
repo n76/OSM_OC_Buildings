@@ -1,0 +1,24 @@
+#! /usr/bin/php
+<?php
+
+$west=-118.13;
+$south=33.38;
+$east=-117.39;
+$north=33.97;
+$chunkSize=0.01;
+$chunkCount=0;
+
+$inputFileName='cleaned.osm';
+$outputDirectory='/Volumes/External\ Drive/OC_Chunks';
+
+for ($s = $south; $s <= $north; $s+=$chunkSize) {
+    for ($w = $west; $w <= $east; $w+=$chunkSize) {
+        $chunkCount++;
+        $e = $w + $chunkSize;
+        $n = $s + $chunkSize;
+        $cmd = "./Extract -b $w,$s,$e,$n -i $inputFileName -o $outputDirectory/chunk$chunkCount.osm";
+        printf("'%s'".PHP_EOL, $cmd);
+        exec($cmd);
+    }
+}
+?>

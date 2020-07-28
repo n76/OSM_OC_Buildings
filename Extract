@@ -1,0 +1,312 @@
+#! /usr/bin/php
+<?php
+
+/*
+ *  Extract an area from an OSM file and place it in a new OSM file.
+ *
+ *  We take advantage that the OSM XML file is formatted in a multi-line
+ *  style so we can simply read lines one at a time. The memory required
+ *  is quite small vs what it would be if we had to actually parse and
+ *  load the entire XML into memory.
+ *
+ *  Conceptually there are three passes:
+ *
+ *  1.  Scan the node definitions gathering up the IDs for those nodes
+ *      that are within the extract boundary area. We place those IDs
+ *      into a "required IDs" list.
+ *  2.  Scan the way definitions. For each way that has at least one
+ *      node in the "required IDs" list, add the ID of the way and all
+ *      of the IDs of its nodes into the "required IDs" list.
+ *  3.  For all objects with IDs in the "required IDs" list, copy
+ *      to our output extract OSM file.
+ *
+ *  We take advantage of the ordering of a typical OSM file (nodes, then
+ *  ways, then relations) to actually perform passes 1 and 2 in one scan
+ *  of the input file.
+ */
+
+/*
+ * Boundary to clip
+ */
+$west   = -179.9;
+$south  = -90.0;
+$east   = 180.0;
+$north  = 90.0;
+
+$requiredIDs = array();
+
+/*
+ *  For statistics OCI-Collection
+ */
+$maxLat = -100.0;
+$minLat = 100.0;
+$maxLon = -190.0;
+$minLon = 190.0;
+$totalNodes = 0;
+$requiredNodes = 0;
+
+function help() {
+    global $argv;
+    fprintf(STDERR, "Calling sequence:" . PHP_EOL);
+    fprintf(STDERR, "\t%s [options]" . PHP_EOL . PHP_EOL, $argv[0]);
+    fprintf(STDERR, "\tOptions:" . PHP_EOL);
+    fprintf(STDERR, "\t\t-b w,s,e,n\tBounds specification (required)." . PHP_EOL);
+    fprintf(STDERR, "\t\t\t\tw(est),s(outh),e(ast),n(orth) are in decimal" . PHP_EOL);
+    fprintf(STDERR, "\t\t\t\tdegrees." . PHP_EOL);
+    fprintf(STDERR, "\t\t-i inFile\tInput file name (required)." . PHP_EOL);
+    fprintf(STDERR, "\t\t-i outFile\tOutput file name. If not specified then." . PHP_EOL);
+    fprintf(STDERR, "\t\t\t\tSTDOUT will be used." . PHP_EOL);
+    exit();
+}
+function parseAttributes($line) {
+    $attributes = array();
+
+    $trimmed = trim($line,"</> \t\n\r\0\x0B");
+    //fprintf(STDERR,"Trimmed: '%s'".PHP_EOL,$trimmed);
+    $parts = explode(' ',$trimmed);
+    foreach ($parts as $p) {
+        $attr = explode('=', $p);
+        if (sizeof($attr) == 2) {
+            $key = $attr[0];
+            $val = trim($attr[1],"'");
+            $attributes[$key] = $val;
+        } // If has equal sign
+    } // For each part
+    return $attributes;
+}
+
+function scan1Node($line) {
+    global $requiredIDs, $west, $south, $east, $north;
+    global $maxLat, $minLat, $maxLon, $minLon;
+    global $totalNodes, $requiredNodes;
+
+    $totalNodes++;
+    $lat = -90.0;
+    $lon = -190.0;
+    $id = 0;
+
+    $attr = parseAttributes($line);
+    foreach ($attr as $key => $val) {
+        switch ($key) {
+            case 'id':
+                $id = $val;
+            break;
+
+            case 'lat':
+                $lat = $val + 0.0;
+            break;
+
+            case 'lon':
+                $lon = $val + 0.0;
+            break;
+        }
+    } // For each attribute
+
+    if ($lat < 0) {
+        printf("Node: %s" . PHP_EOL, $line);
+        printf("id: %s".PHP_EOL, $id);
+        printf("lat: %s".PHP_EOL, $lat);
+        printf("lon: %s".PHP_EOL, $lon);
+        exit();
+    }
+    $maxLat = max($maxLat,$lat);
+    $minLat = min($minLat,$lat);
+    $maxLon = max($maxLon,$lon);
+    $minLon = min($minLon,$lon);
+    if (($lat >= $south) && ($lat <= $north) && ($lon >= $west) && $lon <= $east) {
+        $requiredIDs[$id] = true;
+        $requiredNodes++;
+    }
+}
+
+/*
+ *  1. Add nodes within our bounding box to the requiredID array.
+ *  2. For ways, if any node is in the requiredID array, add the ID of
+ *     the way and all of its nodes to the requiredID array.
+ */
+function scan1($inHandle) {
+    global $requiredIDs;
+
+    fprintf(STDERR,"Pass 1: Scanning data for nodes and ways within bounds.".PHP_EOL);
+    $inWay = false;
+    $wayID = 0;
+    $wayNodes = array();
+    $needWay = false;
+
+    $line = fgets($inHandle);
+    while ($line !== false) {
+        $line = trim($line);
+        if (stripos($line,'<node ') !== false) {
+            scan1Node($line);
+        } else if (stripos($line,'<way ') !== false) {
+            $inWay = true;
+            $needWay = false;
+            $wayAttr = parseAttributes($line);
+            $wayID = $wayAttr['id'];
+            $wayNodes = array();
+        } else if (stripos($line,'</way>') !== false) {
+            $inWay = false;
+            if ($needWay) {
+                //fprintf(STDERR,"Need Way %s.".PHP_EOL, $wayID);
+                $requiredIDs[$wayID] = true;
+                foreach ($wayNodes as $id => $val) {
+                    $requiredIDs[$id] = true;
+                    //fprintf(STDERR,"\tAdding Node %s to requiredIDs.".PHP_EOL, $id);
+                }
+            }
+        } else {
+            if ($inWay) {
+                if (stripos($line,'<nd ') !== false) {
+                    $ndAttr = parseAttributes($line);
+                    if (isset($ndAttr['ref'])) {
+                        $ref = $ndAttr['ref'];
+                        $wayNodes[$ref] = true;
+                        if (isset($requiredIDs[$ref])) {
+                            $needWay = true;
+                        }
+                    }
+                }
+            }
+        }
+        $line = fgets($inHandle);
+    }
+}
+
+function scan2($inHandle, $outHandle) {
+    global $requiredIDs;
+
+    fprintf(STDERR,"Pass 2: Building output.".PHP_EOL);
+
+    $line = fgets($inHandle);
+    $skip = false;
+    while ($line !== false) {
+        $line = trim($line);
+        if (stripos($line,'<node ') !== false) {
+            $attr = parseAttributes($line);
+            if (isset($requiredIDs[$attr['id']])) {
+                fprintf($outHandle, "%s".PHP_EOL, $line);
+            }
+        } else if (stripos($line,'<way ') !== false) {
+            $attr = parseAttributes($line);
+            if (isset($requiredIDs[$attr['id']])) {
+                //fprintf(STDERR,"Need Way %s.".PHP_EOL, $attr['id']);
+                fprintf($outHandle, "%s".PHP_EOL, $line);
+                $skip = false;
+            } else {
+                $skip = true;
+            }
+        } else if (stripos($line,'</way>') !== false) {
+            if (!$skip)
+                fprintf($outHandle, "%s".PHP_EOL, $line);
+            $skip = false;
+        } else {
+            if (!$skip)
+                fprintf($outHandle, "%s".PHP_EOL, $line);
+        }
+        $line = fgets($inHandle);
+    }
+}
+
+/*
+ *  Parse command line arguments
+ */
+$inName = '';
+$outName = '';
+$outHandle = STDOUT;
+
+$bounds = array();
+$argc = 1;
+while (isset($argv[$argc])) {
+    $arg = $argv[$argc];
+    switch ($arg) {
+        case '-b':
+            $argc++;
+            if (isset($argv[$argc])) {
+                $parts = explode(',',$argv[$argc]);
+                $bounds = array();
+                foreach ($parts as $p) {
+                    if (is_numeric($p)) {
+                        $bounds[] = $p + 0.0;
+                    }
+                }
+                if (sizeof($bounds) != 4) {
+                    fprintf(STDERR, "Error: Bad bounds specification." . PHP_EOL);
+                    help();
+                }
+            } else {
+                fprintf(STDERR, "Error: No bounds value specified after '-b'" . PHP_EOL);
+                help();
+            }
+        break;
+
+            case '-i':
+                $argc++;
+                if (isset($argv[$argc])) {
+                    $inName = $argv[$argc];
+                } else {
+                    fprintf(STDERR, "Error: No input file name specified after '-i'" . PHP_EOL);
+                    help();
+                }
+            break;
+
+        case '-o':
+            $argc++;
+            if (isset($argv[$argc])) {
+                $outName = $argv[$argc];
+            } else {
+                fprintf(STDERR, "Error: No output file name specified after '-i'" . PHP_EOL);
+                help();
+            }
+        break;
+
+        default:
+            fprintf(STDERR, "Error: Unknown argument." . PHP_EOL);
+            help();
+        break;
+    }
+    $argc++;
+}
+if (sizeof($bounds) != 4) {
+    fprintf(STDERR, "Error: No bounds specification." . PHP_EOL);
+    help();
+}
+$west   = $bounds[0];
+$south  = $bounds[1];
+$east   = $bounds[2];
+$north  = $bounds[3];
+
+if (($south >= $north) || ($west >= $east)) {
+    fprintf(STDERR, "Error: Bad bounds specification." . PHP_EOL);
+    help();
+}
+
+if ($inName == '') {
+    fprintf(STDERR, "Error: No input file specified." . PHP_EOL);
+    help();
+}
+
+$inHandle = fopen($inName, 'r');
+if ($inHandle === false) {
+    fprintf(STDERR, "Error: Unable to open '%s' for reading." . PHP_EOL, $inName);
+    help();
+}
+
+if ($outName != '') {
+    $outHandle = fopen($outName, 'w');
+    if ($outHandle === false) {
+        fclose($inHandle);
+        fprintf(STDERR, "Error: Unable to create '%s' for output." . PHP_EOL, $outName);
+        help();
+    }
+}
+
+scan1($inHandle);
+fprintf(STDERR,"Nodes %d of %d".PHP_EOL, $requiredNodes, $totalNodes);
+fprintf(STDERR,"Boundary for dataset: %s,%s %s,%s".PHP_EOL, $minLon, $minLat, $maxLon, $maxLat);
+
+fseek($inHandle,0);
+scan2($inHandle, $outHandle);
+fclose($inHandle);
+fclose($outHandle);
+
+?>
