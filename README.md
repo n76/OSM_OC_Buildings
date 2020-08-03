@@ -95,6 +95,8 @@ Spot checks of address data against areas with addresses gathered by walking abo
 
 The height data has a ridiculous number of digits after the decimal place (e.g. 9.05253725 feet) implying a resolution that is impossible to have been measured.
 
+There are some heights that are less than zero which will be removed.
+
 #### Other Potential Issues
 
 The above quality issues means that each house outline and address will need to be manually checked.
@@ -126,6 +128,7 @@ The house number and street name are in a single field with the street name all 
 
 - Split number from front of address. Create a new ['addr:housenumber'](https://wiki.openstreetmap.org/wiki/Key:addr) tag with the number as the value.
 - Fix remaining value (street name).
+    - Separate 'Unit', 'Apt', 'Bldg', etc. suffix into 'addr:unit' tag.
     - Convert remaining value from upper case to capitalized words.
     - Expand abbreviated prefixes (e.g. 'E' to 'East').
     - Expand abbreviated suffixes (e.g. 'AV' and 'AVE' to 'Avenue').
@@ -134,12 +137,13 @@ The house number and street name are in a single field with the street name all 
 
 **Example:**
 ```
-ADDRESS='2102 W GLEN AVE'
+ADDRESS='108 1/2 S MELROSE ST APT 33'
 ```
 **becomes**
 ```
-addr:housenumber='2102'
-addr:street='West Glen Avenue'
+addr:housenumber='108 1/2'
+addr:street='South Melrose Street'
+addr:unit='Apartment 33'
 ```
 
 #### CITY
@@ -162,6 +166,7 @@ Heights are in feet with microscopic precision implied by the number of digits a
 
 - Convert value from feet to meters, round to 1 cm of precision.
 - Change tag from 'HEIGHT' to ['height'](https://wiki.openstreetmap.org/wiki/Key:height).
+- If the height is less than zero, discard.
 
 **Example:**
 ```
@@ -190,12 +195,17 @@ ZIPCODE='92801'
 addr:postcode='92801'
 ```
 
-#### Additional tags
+#### Additional Tags
 The following tags will be added to all building polygons:
 
 ```
 building=yes
 ```
+#### Additional Checks
+In unincorporated areas the "CITY" value is set to "Orange Co".
+
+- Check the postal city (from ZIP code) matches the city.
+- Correct city to postal city if a mismatch is detected.
 
 ### Script
 
@@ -234,7 +244,7 @@ A script that iterates over a bounding box that covers the whole county calls th
 
 This results in 4,440 OSM OSM formatted chunk files.
 
-Since the county is not rectangular, a significant number of the extracted chunks are empty and are discarded after the script completes. This leaves (XXXX?) chunks to be imported.
+Since the county is not rectangular, a significant number of the extracted chunks are empty and are discarded after the script completes. This leaves (1,761) chunks to be imported.
 
 ## Importing a Chunk
 
