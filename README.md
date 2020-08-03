@@ -242,9 +242,9 @@ A script that iterates over a bounding box that covers the whole county calls th
 ./chunkIt
 ```
 
-This results in 4,440 OSM OSM formatted chunk files.
+This results in potentially 4,440 OSM OSM formatted chunk files.
 
-Since the county is not rectangular, a significant number of the extracted chunks are empty and are discarded after the script completes. This leaves (1,761) chunks to be imported.
+Since the county is not rectangular, a significant number of the extracted chunks are empty so only 1,761 chunks need to be imported.
 
 ## Importing a Chunk
 
@@ -252,30 +252,22 @@ Imports will be from the south end of the county to the north. The reason for th
 
 ### User Identification
 
-The user ID of 'n76_oc_import' will be used on all edits.
+The user ID of 'n76_oc_import' will be used on all import edits.
 
 ### Conflation ###
 
-Conflation of data will be a manual operation assisted by the JOSM conflate plug-in.
+Conflation of data will be a manual operation.
 
 1. Load a chunk file into JOSM.
-2. Download current OSM data for that area into a new layer.
-3. For each building in a chunk, verify and correct address data. Specifically:
+2. Using best available aerial imagery, correct building shapes. Initial process testing indicates that **all building shapes will need correcting**.
+3. Download current OSM data for that area into a new layer.
+4. For each building in a chunk, verify and correct address data. Specifically:
     - Remove duplicate addresses from out buildings.
     - Verify that street names match with existing OSM street data.
     - If OSM data already has address tags, make sure that there is no “off by one house” situation.
-4. In the chunk layer, find all buildings ```type:way building=*```
-5. In the configure plug-in panel, click “configure” button and “freeze” selection as the “reference”.
-6. In the OSM data layer, find all buildings ```type:way building=*```
-7. In the configure plug-in panel, click “configure button” and “freeze” selection as the “subject”. Make sure “replace geometry” is unchecked (we are not replacing existing OSM building geometry). Click on “Generate Matches”.
-8. Select a building by clicking on the it in the configuration plug-in’s list of matches.
-    - Verify tag data seems correct.
-    - Click on “conflate” button to update tags on existing OSM building.
-9. Once all matches are conflated, click on the “reference only” tab on the conflate plug in to work with buildings not already in OSM.
-    - Click on a building to select it.
-    - Click on conflate button to copy the building into OSM.
-    - Correct building geometry based on best available OSM compatible imagery.
-10. Once all the buildings in a chunk have been conflated or imported, upload/commit the edit.
+    - If the building already exists in OSM, copy any tags that are missing for that building in the OSM layer from the import chunk layer. Remove the building from the chunk layer.
+5. If any buildings remain in the chunk layer (implying they does not already exist in the OSM layer), merge the chunk layer into the OSM layer.
+10. Once all the buildings in a chunk have been conflated or merged, upload/commit the edit.
 
 ### Changesets
 
