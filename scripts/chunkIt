@@ -7,7 +7,14 @@ $east=-117.39;
 $north=33.97;
 $chunkSize=0.01;
 $chunkCount=0;
-$startChunk=54;         // First real chuck in OC data expected at 54
+
+$chunkCounterFile = 'chunkCounter.txt';
+$startChunk = file_get_contents($chunkCounterFile);
+if ($startChunk === false)
+    $startChunk = 0;
+else
+    $startChunk = (int)$startChunk;
+printf("Starting chunk is %s".PHP_EOL, $startChunk);
 
 $inputFileName='cleaned.osm';
 $outputDirectory='/Volumes/External\ Drive/OC_import/OC_Chunks';
@@ -18,6 +25,7 @@ for ($s = $south; $s <= $north; $s+=$chunkSize) {
         if ($chunkCount >= $startChunk) {
             $e = $w + $chunkSize;
             $n = $s + $chunkSize;
+            file_put_contents ($chunkCounterFile, $chunkCount);
             $cmd = "./scripts/Extract -b $w,$s,$e,$n -i $inputFileName -o $outputDirectory/chunk$chunkCount.osm";
             printf("'%s'".PHP_EOL, $cmd);
             exec($cmd);
