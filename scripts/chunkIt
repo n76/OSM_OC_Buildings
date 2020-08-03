@@ -18,7 +18,7 @@ for ($s = $south; $s <= $north; $s+=$chunkSize) {
         if ($chunkCount >= $startChunk) {
             $e = $w + $chunkSize;
             $n = $s + $chunkSize;
-            $cmd = "./Extract -b $w,$s,$e,$n -i $inputFileName -o $outputDirectory/chunk$chunkCount.osm";
+            $cmd = "./scripts/Extract -b $w,$s,$e,$n -i $inputFileName -o $outputDirectory/chunk$chunkCount.osm";
             printf("'%s'".PHP_EOL, $cmd);
             exec($cmd);
         }
