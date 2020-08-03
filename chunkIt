@@ -7,10 +7,10 @@ $east=-117.39;
 $north=33.97;
 $chunkSize=0.01;
 $chunkCount=0;
-$startChunk=1694;
+$startChunk=54;         // First real chuck in OC data expected at 54
 
 $inputFileName='cleaned.osm';
-$outputDirectory='/Volumes/External\ Drive/OC_Chunks';
+$outputDirectory='/Volumes/External\ Drive/OC_import/OC_Chunks';
 
 for ($s = $south; $s <= $north; $s+=$chunkSize) {
     for ($w = $west; $w <= $east; $w+=$chunkSize) {
