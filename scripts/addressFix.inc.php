@@ -37,6 +37,7 @@ $abbrev = array(
             '/(.*) Bl$/i',
             '/(.*) Blvd$/i',
             '/(.*) Ci$/i',
+            '/(.*) Cir$/i',
             '/(.*) Cr$/i',
             '/(.*) Ct$/i',
             '/(.*) Cv$/i',
@@ -48,10 +49,12 @@ $abbrev = array(
             '/(.*) Hw$/i',
             '/(.*) Hwy$/i',
             '/(.*) Hy$/i',
+            '/(.*) Knl$/i',
             '/(.*) La$/i',
             '/(.*) Ln$/i',
             '/(.*) Lo$/i',
             '/(.*) Lp$/i',
+            '/(.*) N$/i',
             '/(.*) Pa$/i',
             '/(.*) Pk$/i',
             '/(.*) Pkwy$/i',
@@ -68,8 +71,10 @@ $abbrev = array(
             '/(.*) Ter$/i',
             '/(.*) Tl$/i',
             '/(.*) Tr$/i',
+            '/(.*) Trl$/i',
             '/(.*) Tt$/i',
             '/(.*) Vw$/i',
+            '/(.*) W$/i',
             '/(.*) Wa$/i',
             '/(.*) Wl$/i',
             '/(.*) Wk$/i',
@@ -111,11 +116,13 @@ $expanded = array(
             '${1} Saint ${2}',      // St
 
             // Suffixes
+            // See: https://pe.usps.com/text/pub28/28apc_002.htm
             '${1} Avenue',          // Av
             '${1} Avenue',          // Ave
             '${1} Boulevard',       // Bl
             '${1} Boulevard',       // Blvd
             '${1} Circle',          // Ci
+            '${1} Circle',          // Cir
             '${1} Circle',          // Cr
             '${1} Court',           // Ct
             '${1} Cove',            // Cv
@@ -127,10 +134,12 @@ $expanded = array(
             '${1} Highway',         // Hw
             '${1} Highway',         // Hwy
             '${1} Highway',         // Hy
+            '${1} Knoll',           // Knl
             '${1} Lane',            // La
             '${1} Lane',            // Ln
             '${1} Loop',            // Lo
             '${1} Loop',            // Lp
+            '${1} North',           // N
             '${1} Pass',            // Pa
             '${1} Parkway',         // Pk
             '${1} Parkway',         // Pkwy
@@ -147,8 +156,10 @@ $expanded = array(
             '${1} Terrace',         // Ter
             '${1} Trail',           // Tl
             '${1} Terrace',         // Tr Terrace or Trail
+            '${1} Trail',           // Trl
             '${1} Truck Trail',     // Tt
             '${1} View',            // Vw
+            '${1} West',            // W
             '${1} Way',             // Wa
             '${1} Walk',            // Wl
             '${1} Walk',            // Wk
@@ -169,12 +180,103 @@ $unitAbbrev = array(
           '/^Apt (.*)/i',
           '/^Bldg (.*)/i',
           '/^Spc (.*)/i',
+          '/^Ste (.*)/i',
+          '/^Trlr (.*)/i',
       );
 $unitExpanded = array(
           // Prefixes
           'Apartment ${1}',         // Apt
           'Building ${1}',          // Bldg
           'Space ${1}',             // Spc
+          'Suite ${1}',             // Ste
+          'Trailer ${1}',           // Trlr
+      );
+
+$directionals = array(
+        'E' => 'East',
+        'N' => 'North',
+        'Ne' => 'Northeast',
+        'Nw' => 'Northwest',
+        'S' => 'South',
+        'Se' => 'Southeast',
+        'Sw' => 'Southeast',
+        'W' => 'West',
+);
+
+$suffixes = array(
+    'St' => 'Street',
+    'Av' => 'Avenue',
+    'Ave' => 'Avenue',
+    'Bl' => 'Boulevard',
+    'Blvd' => 'Boulevard',
+    'Ci' => 'Circle',
+    'Cir' => 'Circle',
+    'Cr' => 'Circle',
+    'Ct' => 'Court',
+    'Cv' => 'Cove',
+    'Dr' => 'Drive',
+    'Gl' => 'Glen',
+    'Gln' => 'Glen',
+    'Gr' => 'Grade',
+    'Hl' => 'Hill',
+    'Hw' => 'Highway',
+    'Hwy' => 'Highway',
+    'Hy' => 'Highway',
+    'La' => 'Lane',
+    'Ln' => 'Lane',
+    'Lo' => 'Loop',
+    'Lp' => 'Loop',
+    'Pa' => 'Pass',
+    'Pk' => 'Parkway',
+    'Pkwy' => 'Parkway',
+    'Pl' => 'Place',
+    'Pt' => 'Point',
+    'Py' => 'Parkway',
+    'Rd' => 'Road',
+    'Ro' => 'Row',
+    'Rw' => 'Row',
+    'Sq' => 'Square',
+    'St' => 'Street',
+    'St.' => 'Street',
+    'Te' => 'Terrace',
+    'Ter' => 'Terrace',
+    'Tl' => 'Trail',
+    'Tr' => 'Terrace',      // Might also be Trail
+    'Trl' => 'Trail',
+    'Tt' => 'Truck Trail',
+    'Vw' => 'View',
+    'Wa' => 'Way',
+    'Wl' => 'Walk',
+    'Wk' => 'Walk',
+    'Wy' => 'Way',
+    'Xi' => 'Crossing',
+);
+
+$secondaryIdentifiers = array(
+    'Apt' => 'Apartment',
+    'Bldg' => 'Building',
+    'Spc' => 'Space',
+    'Ste' => 'Suite',
+    'Trlr' => 'Trailer',
+    'Unit' => 'Unit',
+);
+
+/*
+ *  Special case word pairs.
+ *
+ *  We have troubles with words like "la". If at the
+ *  end of the street name portion it is an Official
+ *  abbreviation for "Lane". But it might be a Spanish
+ *  word in the middle of the street name (e.g. "Calle la Veta")
+ */
+
+$specialPhrases = array(
+          'Calle La ',
+          ' De La ',
+      );
+$specialUnderscore = array(
+          'Calle_La ',
+          ' De_La ',
       );
 
 /*
@@ -435,8 +537,9 @@ function postalCity($zip, $city='') {
 function validStreetNumber($v) {
     $rslt = is_numeric($v);
     if (!$rslt) {
+        $rslt = true;
         for ($i = 0; $i < strlen($v); $i++){
-            $rslt |= (strpos('0123456789/',$v[$i]) !== false);
+            $rslt &= (strpos('0123456789/',$v[$i]) !== false);
         }
     }
     return $rslt;
@@ -449,21 +552,51 @@ function validStreetNumber($v) {
  *  addr:housenumber = “123 1/2”
  *  addr:street = “South Main Street”
  *  addr:unit = “Apartment 37”
+ *
+ *  See: https://pe.usps.com/text/pub28/28c2_012.htm#ep526349
+ *
+ *  The post office defines the address as consisting of:
+ *      primary address number          --> 123 1/2
+ *      predirectional                  --> S
+ *      street name                     --> MAIN
+ *      suffix                          --> ST
+ *      postdirectional                 --> Could be N, S, E, W, etc.
+ *      secondary address identifier    --> APT
+ *      secondary address               --> 37
+ *
+ *  For OSM purposes:
+ *      Primary address number is addr:housenumber.
+ *
+ *      Predirectional, street name, suffix and postdirectional are
+ *      in addr:street.
+ *
+ *      Secondary address identifier and secondary address are
+ *      in addr:unit.
  */
 function parseAddress($address) {
     global $abbrev, $expanded;
     global $unitAbbrev, $unitExpanded;
+    global $specialPhrases,$specialUnderscore;
+    global $directionals, $suffixes, $secondaryIdentifiers;
 
     $tags = array();
 
     $state = 'number';
-    $parts = array(
-        'number' => array(),
-        'street' => array(),
-        'unit' => array()
-    );
+    $number = '';
+    $predirectional = '';
+    $streetName = '';
+    $unit = '';
 
-    $tokens = explode(' ',ucwords(strtolower($address)));
+    /*
+     * convert spaces to underscores on special phrases
+     * so that things like 'calle la whatever' don't get
+     * turned into 'calle lane'. We will convert them back
+     * later.
+     */
+    $normalizedAddress = ucwords(strtolower($address));
+    $normalizedAddress = str_replace($specialPhrases, $specialUnderscore, $normalizedAddress);
+
+    $tokens = explode(' ',$normalizedAddress);
     foreach ($tokens as $t) {
         /*
          * See if current part is compatible with
@@ -471,33 +604,102 @@ function parseAddress($address) {
          */
         switch ($state) {
             case 'number':
-                if (!validStreetNumber($t))
-                    $state = 'street';
+                if (validStreetNumber($t)) {
+                    $number .= $t . ' ';
+                } else {
+                    if (isset($directionals[$t])) {
+                        $predirectional = $directionals[$t] . ' ';
+                        $state = 'street';
+                    } else {
+                        $state = 'street';
+                        $streetName = $t . ' ';
+                    }
+                }
             break;
 
             case 'street':
-                if (in_array($t,['Unit','Apt','Bldg','Spc']))
-                    $state = 'unit';
+                if ($streetName == '') {
+                    $streetName = $t . ' ';
+                } else {
+                    if (isset($suffixes[$t])) {
+                        $streetName .= $suffixes[$t]  . ' ';
+                        $state = 'postdir';
+                    } else if (in_array($t, $suffixes)) {
+                        $streetName .= $t  . ' ';
+                        $state = 'postdir';
+                    } else if (isset($directionals[$t])) {
+                        $streetName .= $directionals[$t]  . ' ';
+                        $state = 'unit';
+                    } else if (isset($directionals[$t])) {
+                        $streetName .= $directionals[$t]  . ' ';
+                        $state = 'unit';
+                    } else if (in_array($t, $directionals)) {
+                        $streetName .= $t  . ' ';
+                        $state = 'unit';
+                    } else if (isset($secondaryIdentifiers[$t])) {
+                        $unit .= $secondaryIdentifiers[$t]  . ' ';
+                        $state = 'unit';
+                    } else if (in_array($t, $secondaryIdentifiers)) {
+                        $unit .= $t  . ' ';
+                        $state = 'unit';
+                    } else if (is_numeric($t)) {
+                        $unit .= $t  . ' ';
+                        $state = 'unit';
+                    } else {
+                        $streetName .= $t . ' ';
+                    }
+                }
+            break;
+
+            case 'postdir':
+                if (isset($directionals[$t])) {
+                    $streetName .= $directionals[$t]  . ' ';
+                } else if (in_array($t, $directionals)) {
+                    $streetName .= $t  . ' ';
+                } else {
+                    if (isset($secondaryIdentifiers[$t])) {
+                        $unit .= $secondaryIdentifiers[$t]  . ' ';
+                    } else {
+                        $unit .= $t  . ' ';
+                    }
+                }
+                $state = 'unit';
             break;
 
             case 'unit':
+                if (isset($secondaryIdentifiers[$t])) {
+                    $unit .= $secondaryIdentifiers[$t]  . ' ';
+                } else {
+                    $unit .= $t  . ' ';
+                }
             break;
         }
-        $parts[$state][] = $t;
     }
 
-    if (sizeof($parts['number']) > 0) {
-        $tags['addr:housenumber'] = trim(implode(' ', $parts['number']));
+    if ($number != '') {
+        $tags['addr:housenumber'] = trim($number);
     }
-    $street = trim(implode(' ', $parts['street']));
+    /*
+     *  Covert the underscores in our special phrases back
+     *  into spaces.
+     */
+    $street = trim($predirectional . str_replace('_',' ',$streetName));
+
+
     $tags['addr:street'] = preg_replace($abbrev, $expanded, $street);
-    if (sizeof($parts['unit']) > 1) {
-        $unit = trim(implode(' ', $parts['unit']));
+    if ($unit != '') {
+        $unit = trim($unit);
         $tags['addr:unit'] = preg_replace($unitAbbrev, $unitExpanded, $unit);
     }
-//    if (sizeof($parts['unit']) == 1) {
-//        fprintf(STDERR,"%s => %s".PHP_EOL, $address, serialize($tags));
-//    }
+
+    if (false && $unit != '') {
+        fprintf(STDERR,"%s => %s".PHP_EOL, $address, serialize($tags));
+        fprintf(STDERR,"\tNumber: %s".PHP_EOL,$number);
+        fprintf(STDERR,"\tPredirectional: %s".PHP_EOL,$predirectional);
+        fprintf(STDERR,"\tStreetName: %s".PHP_EOL,$streetName);
+        fprintf(STDERR,"\tUnit: %s".PHP_EOL,$unit);
+        exit();
+    }
     return $tags;
 }
 

@@ -16,7 +16,7 @@ else
     $startChunk = (int)$startChunk;
 printf("Starting chunk is %s".PHP_EOL, $startChunk);
 
-$inputFileName='cleaned.osm';
+$inputFileName='transformed.osm';
 $outputDirectory='/Volumes/External\ Drive/OC_import/OC_Chunks';
 
 for ($s = $south; $s <= $north; $s+=$chunkSize) {
@@ -26,9 +26,16 @@ for ($s = $south; $s <= $north; $s+=$chunkSize) {
             $e = $w + $chunkSize;
             $n = $s + $chunkSize;
             file_put_contents ($chunkCounterFile, $chunkCount);
-            $cmd = "./scripts/Extract -b $w,$s,$e,$n -i $inputFileName -o $outputDirectory/chunk$chunkCount.osm";
+            $osmFile = $outputDirectory . "/chunk" . $chunkCount . ".new.osm";
+            $centroidFile = $outputDirectory . "/chunk" . $chunkCount . ".centroid.osm";
+            $cmd = "./scripts/Extract -b $w,$s,$e,$n -i $inputFileName -o $osmFile";
             printf("'%s'".PHP_EOL, $cmd);
             exec($cmd);
+            //if (file_exists ( $osmFile )) {
+                $cmd = "./scripts/centroidIt -i $osmFile -o $centroidFile";
+                printf("'%s'".PHP_EOL, $cmd);
+                exec($cmd);
+            //}
         }
     }
 }

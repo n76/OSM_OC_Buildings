@@ -1,0 +1,231 @@
+#! /usr/bin/php
+<?php
+
+/*
+ *  Convert building ways into nodes
+ *
+ *  Reason: Building outlines in OC import data are
+ *  horrible and it takes longer to fix them that to
+ *  create new outlines.
+ */
+
+$nodes = array();
+
+function help() {
+    global $argv;
+    fprintf(STDERR, "Calling sequence:" . PHP_EOL);
+    fprintf(STDERR, "\t%s [options]" . PHP_EOL . PHP_EOL, $argv[0]);
+    fprintf(STDERR, "\tOptions:" . PHP_EOL);
+    fprintf(STDERR, "\t\t-i inFile\tInput file name (required)." . PHP_EOL);
+    fprintf(STDERR, "\t\t-i outFile\tOutput file name. If not specified then." . PHP_EOL);
+    fprintf(STDERR, "\t\t\t\tSTDOUT will be used." . PHP_EOL);
+    exit();
+}
+function parseAttributes($line) {
+    $attributes = array();
+
+    $trimmed = trim($line,"</> \t\n\r\0\x0B");
+    //fprintf(STDERR,"Trimmed: '%s'".PHP_EOL,$trimmed);
+    $parts = explode(' ',$trimmed);
+    foreach ($parts as $p) {
+        $attr = explode('=', $p);
+        if (sizeof($attr) == 2) {
+            $key = $attr[0];
+            $val = trim($attr[1],"'");
+            $attributes[$key] = $val;
+        } // If has equal sign
+    } // For each part
+    return $attributes;
+}
+
+function scanNode($line) {
+    global $nodes;
+
+    $lat = -90.0;
+    $lon = -190.0;
+    $id = 0;
+
+    $attr = parseAttributes($line);
+    foreach ($attr as $key => $val) {
+        switch ($key) {
+            case 'id':
+                $id = $val;
+            break;
+
+            case 'lat':
+                $lat = $val + 0.0;
+            break;
+
+            case 'lon':
+                $lon = $val + 0.0;
+            break;
+        }
+    } // For each attribute
+
+    if ($lat < 0) {
+        printf("Node: %s" . PHP_EOL, $line);
+        printf("id: %s".PHP_EOL, $id);
+        printf("lat: %s".PHP_EOL, $lat);
+        printf("lon: %s".PHP_EOL, $lon);
+        exit();
+    }
+
+    $LatLon = array();
+    $LatLon['lat'] = $lat;
+    $LatLon['lon'] = $lon;
+    $nodes[$id] = $LatLon;
+}
+
+function centroid( $nodeIds )
+{
+    global $nodes;
+
+    $lat = 0.0;
+    $lon = 0.0;
+    $n = 0;
+    foreach ($nodeIds as $k => $v) {
+        if (isset($nodes[$k])) {
+            $n++;
+            $lat += $nodes[$k]['lat'];
+            $lon += $nodes[$k]['lon'];
+        } else {
+            fprintf(STDERR, "Unknown node: %s".PHP_EOL, $k);
+            return false;
+        }
+    }
+    if ($n > 0) {
+        $lat = $lat / $n;
+        $lon = $lon / $n;
+        $rslt = array();
+        $rslt['lat'] = $lat;
+        $rslt['lon'] = $lon;
+        return $rslt;
+    }
+    return false;
+}
+/*
+ *  Get Lat,Lon for all nodes.
+ *
+ *  For each way, centroid the nodes associated with it then emit
+ *  a replacement node with the same tags.
+ */
+function scan($inHandle, $outHandle) {
+    global $nodes;
+
+    $inWay = false;
+    $wayID = 0;
+    $wayNodes = array();
+    $wayTags = array();
+
+    $line = fgets($inHandle);
+    while ($line !== false) {
+        $line = trim($line);
+        if (stripos($line,'<node ') !== false) {
+            scanNode($line);
+        } else if (stripos($line,'<way ') !== false) {
+            $inWay = true;
+            $wayAttr = parseAttributes($line);
+            $wayID = $wayAttr['id'];
+            $wayNodes = array();
+            $wayTags = array();
+        } else if (stripos($line,'</way>') !== false) {
+            $inWay = false;
+            /*
+             * Centroid way and emit new node
+             */
+             $LatLon = centroid( $wayNodes );
+             if ($LatLon !== false) {
+                 fprintf($outHandle,"<node id='%s' lat='%s' lon='%s' >".PHP_EOL, $wayID, $LatLon['lat'], $LatLon['lon']);
+                 foreach ($wayTags as $l) {
+                     fprintf($outHandle, "%s".PHP_EOL, $l);
+                 }
+                 fprintf($outHandle,"</node>".PHP_EOL);
+             }
+        } else {
+            if ($inWay) {
+                if (stripos($line,'<nd ') !== false) {
+                    $ndAttr = parseAttributes($line);
+                    if (isset($ndAttr['ref'])) {
+                        $ref = $ndAttr['ref'];
+                        $wayNodes[$ref] = true;
+                    }
+                } elseif (stripos($line,'<tag ') !== false) {
+                    $tagAttr = parseAttributes($line);
+                    if (isset($tagAttr['k']) && isset($tagAttr['v'])) {
+                        $wayTags[] = $line;
+                    }
+                }
+            } else {
+                fprintf($outHandle, "%s".PHP_EOL, $line);
+            }
+        }
+        $line = fgets($inHandle);
+    }
+}
+
+/*
+ *  Parse command line arguments
+ */
+$inName = '';
+$outName = '';
+$outHandle = STDOUT;
+
+$bounds = array();
+$argc = 1;
+while (isset($argv[$argc])) {
+    $arg = $argv[$argc];
+    switch ($arg) {
+        case '-i':
+            $argc++;
+            if (isset($argv[$argc])) {
+                $inName = $argv[$argc];
+            } else {
+                fprintf(STDERR, "Error: No input file name specified after '-i'" . PHP_EOL);
+                help();
+            }
+        break;
+
+        case '-o':
+            $argc++;
+            if (isset($argv[$argc])) {
+                $outName = $argv[$argc];
+            } else {
+                fprintf(STDERR, "Error: No output file name specified after '-o'" . PHP_EOL);
+                help();
+            }
+        break;
+
+        default:
+            fprintf(STDERR, "Error: Unknown argument." . PHP_EOL);
+            help();
+        break;
+    }
+    $argc++;
+}
+
+if ($inName == '') {
+    fprintf(STDERR, "Error: No input file specified." . PHP_EOL);
+    help();
+}
+
+$inHandle = fopen($inName, 'r');
+if ($inHandle === false) {
+    fprintf(STDERR, "Error: Unable to open '%s' for reading." . PHP_EOL, $inName);
+    help();
+}
+
+if ($outName != '') {
+    $outHandle = fopen($outName, 'w');
+    if ($outHandle === false) {
+        fclose($inHandle);
+        fprintf(STDERR, "Error: Unable to create '%s' for output." . PHP_EOL, $outName);
+        help();
+    }
+}
+
+scan($inHandle, $outHandle);
+
+fclose($inHandle);
+fclose($outHandle);
+
+?>
