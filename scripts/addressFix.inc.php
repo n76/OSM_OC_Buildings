@@ -34,20 +34,26 @@ $abbrev = array(
             // Suffixes
             '/(.*) Av$/i',
             '/(.*) Ave$/i',
+            '/(.*) Bch$/i',
             '/(.*) Bl$/i',
             '/(.*) Blvd$/i',
+            '/(.*) Bnd$/i',
             '/(.*) Ci$/i',
             '/(.*) Cir$/i',
             '/(.*) Cr$/i',
+            '/(.*) Crst$/i',
             '/(.*) Ct$/i',
             '/(.*) Cv$/i',
             '/(.*) Cy$/i',
+            '/(.*) Cyn$/i',
             '/(.*) Dr$/i',
             '/(.*) Gl$/i',
             '/(.*) Gln$/i',
             '/(.*) Gr$/i',
+            '/(.*) Hvn$/i',
             '/(.*) Hw$/i',
             '/(.*) Hwy$/i',
+            '/(.*) Hts$/i',
             '/(.*) Hy$/i',
             '/(.*) Knl$/i',
             '/(.*) La$/i',
@@ -55,13 +61,16 @@ $abbrev = array(
             '/(.*) Lo$/i',
             '/(.*) Lp$/i',
             '/(.*) N$/i',
+            '/(.*) Orch$/i',
             '/(.*) Pa$/i',
             '/(.*) Pk$/i',
             '/(.*) Pkwy$/i',
             '/(.*) Pl$/i',
+            '/(.*) Prt$/i',
             '/(.*) Pt$/i',
             '/(.*) Py$/i',
             '/(.*) Rd$/i',
+            '/(.*) Rdg$/i',
             '/(.*) Ro$/i',
             '/(.*) Rw$/i',
             '/(.*) Sq$/i',
@@ -119,20 +128,26 @@ $expanded = array(
             // See: https://pe.usps.com/text/pub28/28apc_002.htm
             '${1} Avenue',          // Av
             '${1} Avenue',          // Ave
+            '${1} Beach',           // Bch
             '${1} Boulevard',       // Bl
             '${1} Boulevard',       // Blvd
+            '${1} Bend',            // Bnd
             '${1} Circle',          // Ci
             '${1} Circle',          // Cir
             '${1} Circle',          // Cr
+            '${1} Crest',           // Crst
             '${1} Court',           // Ct
             '${1} Cove',            // Cv
             '${1} Canyon',          // Cy
+            '${1} Canyon',          // Cyn
             '${1} Drive',           // Dr
             '${1} Glen',            // Gl
             '${1} Glen',            // Gln
             '${1} Grade',           // Gr Grade or Grove
+            '${1} Haven',           // Hvn
             '${1} Highway',         // Hw
             '${1} Highway',         // Hwy
+            '${1} Heights',         // Hts
             '${1} Highway',         // Hy
             '${1} Knoll',           // Knl
             '${1} Lane',            // La
@@ -140,13 +155,16 @@ $expanded = array(
             '${1} Loop',            // Lo
             '${1} Loop',            // Lp
             '${1} North',           // N
+            '${1} Orchard',         // Orch
             '${1} Pass',            // Pa
             '${1} Parkway',         // Pk
             '${1} Parkway',         // Pkwy
             '${1} Place',           // Pl
+            '${1} Port',            // Prt
             '${1} Point',           // Pt
             '${1} Parkway',         // Py
             '${1} Road',            // Rd
+            '${1} Ridge',           // Rdg
             '${1} Row',             // Ro
             '${1} Row',             // Rw
             '${1} Square',          // Sq
@@ -511,7 +529,7 @@ function postalCity($zip, $city='') {
         $match = false;
         $newCity = '';
         if (is_array($candidates)) {
-            $match = ($city != '') and in_array($city, $candidates);
+            $match = ($city != '') && in_array($city, $candidates);
             $newCity = $candidates[0];
         } else {
             $match = ($city == $candidates);
@@ -643,6 +661,9 @@ function parseAddress($address) {
                         $unit .= $t  . ' ';
                         $state = 'unit';
                     } else if (is_numeric($t)) {
+                        $unit .= $t  . ' ';
+                        $state = 'unit';
+                    } else if (strlen($t) == 1) { // 'A', 'B', etc.
                         $unit .= $t  . ' ';
                         $state = 'unit';
                     } else {
