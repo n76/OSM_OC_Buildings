@@ -32,7 +32,7 @@ function fixTags($tags) {
 
             case 'Height':          // Convert from feet to meters.
                 $hgt = round(($val+0.0)*0.3048,2);
-                if ($hgt > 0.0){
+                if ($hgt > 2.0){
                     $fixed['height'] = $hgt;
                     //$fixed['source:height'] = ATTRIBUTION;
                 }
