@@ -1,0 +1,395 @@
+#! /usr/bin/php
+<?php
+
+    $nodesAdded = 0;
+    $nodesMerged = 0;
+    $waysMerged = 0;
+
+    $nodeLoc = array();
+
+    function status() {
+        global $nodesAdded, $nodesMerged, $waysMerged;
+
+        fprintf(STDERR,"Added: %s    Nodes Merged: %s    Ways Merged: %s\r",
+                       $nodesAdded, $nodesMerged, $waysMerged);
+    }
+
+    function safeArrayAccess($key, $array, $default)
+    {
+        if (isset($array[$key]))
+            return $array[$key];
+        else return $default;
+    }
+
+    function getTags($obj)
+    {
+        $rslt = array();
+        foreach ($obj->tag as $tag) {
+            $key = (string) $tag['k'];
+            $val = (string) $tag['v'];
+            $rslt[$key] = $val;
+        }
+        return $rslt;
+    }
+
+    /*
+     *  Calculates the great-circle distance between two points
+     *  using the Vincenty formula. See:
+     *
+     *  https://stackoverflow.com/questions/10053358/measuring-the-distance-between-two-coordinates-in-php
+     *
+     */
+    function nodeDistance($attr1, $attr2)
+    {
+        $earthRadius = 6371000;
+
+        $lat1 = deg2rad((float) safeArrayAccess('lat',$attr1,'0.0'));
+        $lon1 = deg2rad((float) safeArrayAccess('lon',$attr1,'0.0'));
+        $lat2 = deg2rad((float) safeArrayAccess('lat',$attr2,'0.0'));
+        $lon2 = deg2rad((float) safeArrayAccess('lon',$attr2,'0.0'));
+
+        $lonDelta = $lon2 - $lon1;
+        $a = pow(cos($lat2) * sin($lonDelta), 2) +
+        pow(cos($lat1) * sin($lat2) - sin($lat1) * cos($lat2) * cos($lonDelta), 2);
+        $b = sin($lat1) * sin($lat2) + cos($lat1) * cos($lat2) * cos($lonDelta);
+
+        $angle = atan2(sqrt($a), $b);
+        return $angle * $earthRadius;
+    }
+
+    /*
+     *  Check if a point is within a polygon
+     *  See:
+     *
+     *  http://tutorialspots.com/php-detect-point-in-polygon-506.html
+     *  https://gist.github.com/vzool/e5ee5fab6608c7a9e82e2c4b800a86e3
+     */
+    function isWithin($node, $vertices)
+    {
+        $oddNodes = false;
+
+        $attrs = $node->attributes();
+        $point = array();
+        $point['x'] = $attrs['lon'];
+        $point['y'] = $attrs['lat'];
+
+        //fprintf(STDERR,'isWithin(): Node: %s,%s'.PHP_EOL,$point['x'], $point['y']);
+        //foreach ($vertices as $pt) {
+        //    fprintf(STDERR,"isWithin(): \tPoly: %s,%s".PHP_EOL,$pt['x'],$pt['y']);
+        //}
+
+        /*
+         * Assure that our polygon is closed
+         */
+        if($vertices[0] != $vertices[count($vertices)-1]) {
+            $vertices[count($vertices)] = $vertices[0];
+        }
+
+        /*
+         *  Check to see if point is exactly on a vertice of
+         *  the polygon.
+         */
+         foreach ($vertices as $pt) {
+            if (($point['x'] == $pt['x']) &&
+                ($point['y'] == $pt['y']))
+            return true;
+         }
+
+        /*
+         *  Count line crossings. Odd number means point
+         *  is within the polygon.
+         */
+        $intersections = 0;
+        $vertices_count = count($vertices);
+
+        for ($i=1; $i < $vertices_count; $i++) {
+            $vertex1 = $vertices[$i-1];
+            $vertex2 = $vertices[$i];
+            /*
+             *  Check if point is on an horizontal polygon boundary
+             */
+            if (($vertex1['y'] == $vertex2['y']) &&
+                ($vertex1['y'] == $point['y']) &&
+                ($point['x'] > min($vertex1['x'], $vertex2['x'])) &&
+                ($point['x'] < max($vertex1['x'], $vertex2['x']))) {
+                return true;
+            }
+            /*
+             *  Check if point is on the polygon boundary (other than horizontal)
+             */
+            if (($point['y'] > min($vertex1['y'], $vertex2['y'])) &&
+                ($point['y'] <= max($vertex1['y'], $vertex2['y'])) &&
+                ($point['x'] <= max($vertex1['x'], $vertex2['x'])) &&
+                ($vertex1['y'] != $vertex2['y'])) {
+                $xinters = ($point['y'] - $vertex1['y']) * ($vertex2['x'] - $vertex1['x']) / ($vertex2['y'] - $vertex1['y']) + $vertex1['x'];
+                if ($xinters == $point['x']) {
+                    return true;
+                }
+                if (($vertex1['x'] == $vertex2['x']) ||
+                    ($point['x'] <= $xinters)) {
+                    $intersections++;
+                }
+            }
+        }
+        /*
+         *  If the number of edges we passed through is odd,
+         *  then it's in the polygon.
+         */
+        return ($intersections % 2 != 0);
+    }
+
+    /*
+     *  Many (most) nodes in a OSM data set have no tags.
+     *  To speed things up, we will short circuit the address
+     *  check if the array of tags is empty.
+     */
+    function addressMatch($obj1, $obj2)
+    {
+        $tags1 = getTags($obj1);
+        if (sizeof($tags1) == 0)
+            return false;
+        $tags2 = getTags($obj2);
+        if (sizeof($tags2) == 0)
+            return false;
+
+        $street1 = safeArrayAccess('addr:street', $tags1, '');
+        $number1 = safeArrayAccess('addr:housenumber', $tags1, '');
+        $unit1 = safeArrayAccess('addr:unit', $tags1, '');
+
+        $street2 = safeArrayAccess('addr:street', $tags2, '');
+        $number2 = safeArrayAccess('addr:housenumber', $tags2, '');
+        $unit2 = safeArrayAccess('addr:unit', $tags2, '');
+
+        return (($street1 != '') &&
+                ($number1 != '') &&
+                ($street1 == $street2) &&
+                ($number1 == $number2) &&
+                ($unit1 == $unit2));
+    }
+
+    function addNodeToOsm($node) {
+        global $osmData, $nodesAdded;
+
+        $newNode = $osmData->addChild('node');
+        $newNode->addAttribute('action', 'modify');
+        foreach ($node->attributes() as $k => $v) {
+            $newNode->addAttribute($k,$v);
+        }
+        foreach (getTags($node) as $k => $v) {
+            $newTag = $newNode->addChild('tag');
+            $newTag->addAttribute('k',$k);
+            $newTag->addAttribute('v',$v);
+        }
+        $nodesAdded++;
+    }
+
+    function mergeWithExisting($node, $osmObj)
+    {
+        $newTags = getTags($node);
+        $osmTags = getTags($osmObj);
+        $modified = false;
+
+        /*
+         *  Special case: On storage tanks only copy
+         *  height data (not a building, etc.)
+         */
+         if (isset($osmTags['man_made'])) {
+             if (isset($newTags['height'])) {
+                 $addTag = $osmObj->addChild('tag');
+                 $addTag->addAttribute('k','height');
+                 $addTag->addAttribute('v',$newTags['height']);
+                 $modified = true;
+             }
+         } else {
+             /*
+              * Only add tags, if OSM has existing one, leave
+              * it unchanged. Also, don't add building tag to
+              * anything.
+              *
+              * And only put heights on buildings.
+              */
+             $isBuilding = isset($osmTags['building']);
+             foreach ($newTags as $k => $v) {
+                 if ($k == 'building') {
+                     // Do not copy building tag to existing object
+                 } else {
+                     // Only copy tags that are not already set.
+                     // That is, don't change existing tags.
+                     if (!isset($osmTags[$k])) {
+                         $newTag = $osmObj->addChild('tag');
+                         $newTag->addAttribute('k',$k);
+                         $newTag->addAttribute('v',$v);
+                         $modified = true;
+                     }
+                 }
+             }
+         }
+        if ($modified) {
+            $attrs = $osmObj->attributes();
+            if (!isset($attrs['action']))
+                $osmObj->addAttribute('action', 'modify');
+        }
+    }
+
+    function conflateWithNodes($node)
+    {
+        global $osmData, $nodesMerged;
+
+        $matched = false;
+        /*
+         *  Check for address match and, if the address matches,
+         *  the distance the nodes are apart. If they match and
+         *  are close enough then we copy the tags to the OSM version.
+         */
+        foreach ($osmData->node as $osmNode) {
+            if (!$matched &&
+                (addressMatch($node, $osmNode)) &&
+                (nodeDistance($node->attributes(),
+                              $osmNode->attributes()) < 5.5)) {
+                mergeWithExisting($node, $osmNode);
+                $nodesMerged++;
+                $matched = true;
+            }
+        }
+        return $matched;
+    }
+
+    function conflateWithPolygons($node)
+    {
+        global $osmData, $nodeLoc, $waysMerged;
+
+        $matched = false;
+        /*
+         *  Only match the first building we find
+         *  that the node is inside of.
+         */
+        foreach ($osmData->way as $osmWay) {
+            $wayTags = getTags($osmWay);
+            if (!$matched &&
+                (isset($wayTags['building']) ||
+                 isset($wayTags['man_made']))) {
+
+                /*
+                 *  Create vertice array from nodes in way
+                 *  definition.
+                 */
+                $vertices = array();
+                foreach ($osmWay->nd as $nd) {
+                    $ndAttrs = $nd->attributes();
+                    $ndID = (string) safeArrayAccess('ref',$ndAttrs,'-1');
+                    if (isset($nodeLoc[$ndID])) {
+                        $nodeInfo = $nodeLoc[$ndID];
+                        $point = array();
+                        $point['x'] = $nodeInfo[0];
+                        $point['y'] = $nodeInfo[1];
+                        $vertices[] = $point;
+                    }
+                }
+
+                /*
+                 *  If node is within polygon then
+                 *  copy its tags to the way.
+                 */
+                //fprintf(STDERR,"isWithin() returned %s".PHP_EOL.PHP_EOL,(isWithin($node, $vertices)?'true':'false'));
+                if (isWithin($node, $vertices)) {
+                    mergeWithExisting($node, $osmWay);
+                    $waysMerged++;
+                    $matched = true;
+                }
+            }
+        }
+
+        return $matched;
+    }
+
+    function conflateAddr($node)
+    {
+        $matched = conflateWithNodes($node);
+        if (!$matched)
+            $matched = conflateWithPolygons($node);
+        if (!$matched)
+            addNodeToOsm($node);
+        status();
+    }
+
+    /*
+     *  Get address points to import
+     */
+    $xmlstr = stream_get_contents(STDIN);
+    $addrPoints = new SimpleXMLElement($xmlstr);
+    if ($addrPoints == false) {
+        printf(STDERR, "Unable to parse address points data from file.".PHP_EOL);
+        exit;
+    }
+
+    /*
+     *  Determine bounding box for data being imported
+     */
+    $minLat = 91.0;
+    $maxLat = -91.0;
+    $minLon = 181.0;
+    $maxLon = -181.0;
+    foreach ($addrPoints->node as $node) {
+        foreach ($node->attributes() as $k => $v) {
+            //fprintf(STDERR, "%s => %s".PHP_EOL, $k, $v);
+            $v = (float) $v;
+            switch ($k) {
+                case 'lat':
+                    if ($v > $maxLat) $maxLat = $v;
+                    if ($v < $minLat) $minLat = $v;
+                break;
+
+                case 'lon':
+                    if ($v > $maxLon) $maxLon = $v;
+                    if ($v < $minLon) $minLon = $v;
+                break;
+            }
+        }
+    }
+    // fprintf(STDERR,'BBox=%3.5f,%3.5f %3.5f,%3.5f'.PHP_EOL, $minLon, $minLon, $maxLon, $maxLat);
+
+    /*
+     * Download OSM data for the area. We expand the bounding box
+     * slightly to assure we have all the data we might need.
+     */
+    $maxLat += 0.0001;
+    $minLat -= 0.0001;
+    $maxLon += 0.0001;
+    $minLon -= 0.0001;
+    $url = "https://api.openstreetmap.org/api/0.6/map?bbox=$minLon,$minLat,$maxLon,$maxLat";
+
+    //$url="/Volumes/External Drive/OC_import/OC_Chunks/chunk1945.current.osm";
+    //fprintf(STDERR,'URL=%s'.PHP_EOL, $url);
+    $osmStr = file_get_contents($url);
+    $osmData = new SimpleXMLElement($osmStr);
+    if ($osmData == false) {
+        printf(STDERR, "Unable to download or parse OSM data.".PHP_EOL);
+        exit;
+    }
+
+    /*
+     * Create an index with the location of each node
+     */
+    foreach ($osmData->node as $osmNode) {
+        $attrs = $osmNode->attributes();
+        $id = (string) $attrs['id'];
+        $loc = array();
+        $loc[] = (float) safeArrayAccess('lon',$attrs,'0.0');
+        $loc[] = (float) safeArrayAccess('lat',$attrs,'0.0');
+        $nodeLoc[$id] = $loc;
+    }
+
+    /*
+     *  For each address point, conflate it with existing OSM data.
+     */
+    foreach ($addrPoints->node as $node) {
+        conflateAddr($node);
+        $modified = false;
+    }
+
+    /*
+     *  Generate conflated OSM XML data file
+     */
+    echo $osmData->asXML();
+    fprintf(STDERR,PHP_EOL);
+?>
