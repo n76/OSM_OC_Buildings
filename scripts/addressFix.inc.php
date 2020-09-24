@@ -221,6 +221,16 @@ $directionals = array(
         'W' => 'West',
 );
 
+$intermediates = array(
+    'Gl' => 'Glen',
+    'Gln' => 'Glen',
+    'Hl' => 'Hill',
+    'Mdw' => 'Meadow',
+    'Pa' => 'Pass',
+    'Spgs' => 'Springs',
+    'Vw' => 'View',
+);
+
 $suffixes = array(
     'St' => 'Street',
     'Av' => 'Avenue',
@@ -233,10 +243,7 @@ $suffixes = array(
     'Ct' => 'Court',
     'Cv' => 'Cove',
     'Dr' => 'Drive',
-    'Gl' => 'Glen',
-    'Gln' => 'Glen',
     'Gr' => 'Grade',
-    'Hl' => 'Hill',
     'Hw' => 'Highway',
     'Hwy' => 'Highway',
     'Hy' => 'Highway',
@@ -244,11 +251,10 @@ $suffixes = array(
     'Ln' => 'Lane',
     'Lo' => 'Loop',
     'Lp' => 'Loop',
-    'Pa' => 'Pass',
     'Pk' => 'Parkway',
     'Pkwy' => 'Parkway',
     'Pl' => 'Place',
-    'Pt' => 'Point',
+    'Pt' => 'Point',        // Might also be Pointe
     'Py' => 'Parkway',
     'Rd' => 'Road',
     'Ro' => 'Row',
@@ -262,7 +268,6 @@ $suffixes = array(
     'Tr' => 'Terrace',      // Might also be Trail
     'Trl' => 'Trail',
     'Tt' => 'Truck Trail',
-    'Vw' => 'View',
     'Wa' => 'Way',
     'Wl' => 'Walk',
     'Wk' => 'Walk',
@@ -596,6 +601,7 @@ function parseAddress($address) {
     global $unitAbbrev, $unitExpanded;
     global $specialPhrases,$specialUnderscore;
     global $directionals, $suffixes, $secondaryIdentifiers;
+    global $intermediates;
 
     $tags = array();
 
@@ -623,19 +629,24 @@ function parseAddress($address) {
         switch ($state) {
             case 'number':
                 if (validStreetNumber($t)) {
-                    $number .= $t . ' ';
+                    $number = $t . ' ';
                 } else {
+                    if (isset($intermediates[$t])) {
+                        $t = $intermediates[$t]  . ' ';
+                    }
                     if (isset($directionals[$t])) {
                         $predirectional = $directionals[$t] . ' ';
-                        $state = 'street';
                     } else {
-                        $state = 'street';
                         $streetName = $t . ' ';
                     }
+                    $state = 'street';
                 }
             break;
 
             case 'street':
+                if (isset($intermediates[$t])) {
+                    $t = $intermediates[$t]  . ' ';
+                }
                 if ($streetName == '') {
                     $streetName = $t . ' ';
                 } else {
