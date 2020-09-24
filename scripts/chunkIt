@@ -1,12 +1,40 @@
 #! /usr/bin/php
 <?php
 
+$inputFileName='transformed.osm';
+$outputDirectory='/Volumes/External\ Drive/OC_import/OC_Chunks';
+
 $west=-118.13;
 $south=33.38;
 $east=-117.39;
 $north=33.97;
 $chunkSize=0.01;
 $chunkCount=0;
+
+function is_completed($chunkNumber) {
+    global $outputDirectory;
+
+    // We have a number of different naming conventions used, so
+    // check for each.
+    $completedDir = stripslashes($outputDirectory) . '/aCompleted/';
+    $files = array(
+        $completedDir . 'centroid.chunk' . $chunkNumber . '.osm',
+        $completedDir . 'chunk' . $chunkNumber . '.centroid.osm',
+        $completedDir . 'chunk' . $chunkNumber . '.conflated.osm',
+        $completedDir . 'chunk' . $chunkNumber . '.new.osm',
+        $completedDir . 'conflated.chunk' . $chunkNumber . '.osm',
+    );
+    $rslt = false;
+    foreach ($files as $f) {
+        $e = file_exists($f);
+        $rslt |= $e;
+    }
+
+    if ($rslt) {
+        printf("    Chunk $chunkNumber has been completed." . PHP_EOL);
+    }
+    return $rslt;
+}
 
 $chunkCounterFile = 'chunkCounter.txt';
 $startChunk = file_get_contents($chunkCounterFile);
@@ -16,25 +44,31 @@ else
     $startChunk = (int)$startChunk;
 printf("Starting chunk is %s".PHP_EOL, $startChunk);
 
-$inputFileName='transformed.osm';
-$outputDirectory='/Volumes/External\ Drive/OC_import/OC_Chunks';
-
 for ($s = $south; $s <= $north; $s+=$chunkSize) {
     for ($w = $west; $w <= $east; $w+=$chunkSize) {
         $chunkCount++;
-        if ($chunkCount >= $startChunk) {
+        if (($chunkCount >= $startChunk)&&
+            (!is_completed($chunkCount))) {
             $e = $w + $chunkSize;
             $n = $s + $chunkSize;
             file_put_contents ($chunkCounterFile, $chunkCount);
-            $osmFile = $outputDirectory . "/chunk" . $chunkCount . ".new.osm";
-            $centroidFile = $outputDirectory . "/chunk" . $chunkCount . ".centroid.osm";
+            $osmFile = $outputDirectory . "/chunk" . $chunkCount . ".osm";
+            $centroidFile = $outputDirectory . "/centroid.chunk" . $chunkCount . ".osm";
+            $conflatedFile = $outputDirectory . "/conflated.chunk" . $chunkCount . ".osm";
+
             $cmd = "./scripts/Extract -b $w,$s,$e,$n -i $inputFileName -o $osmFile";
-            printf("'%s'".PHP_EOL, $cmd);
+            //printf("'%s'".PHP_EOL, $cmd);
             exec($cmd);
+            //sleep(1);       // Hack to get file_exists to work???
             //if (file_exists ( $osmFile )) {
                 $cmd = "./scripts/centroidIt -i $osmFile -o $centroidFile";
-                printf("'%s'".PHP_EOL, $cmd);
+                //printf("'%s'".PHP_EOL, $cmd);
                 exec($cmd);
+
+
+                //$cmd = "./scripts/conflate < $centroidFile > $conflatedFile";
+                //printf("'%s'".PHP_EOL, $cmd);
+                //exec($cmd);
             //}
         }
     }
