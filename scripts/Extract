@@ -295,17 +295,23 @@ scan1($inHandle);
 fprintf(STDERR,"Nodes %d of %d".PHP_EOL, $requiredNodes, $totalNodes);
 fprintf(STDERR,"Boundary for dataset: %s,%s %s,%s".PHP_EOL, $minLon, $minLat, $maxLon, $maxLat);
 
-if (sizeof($requiredIDs) > 0) {
-    if ($outName != '') {
-        $outHandle = fopen($outName, 'w');
-        if ($outHandle === false) {
-            fclose($inHandle);
-            fprintf(STDERR, "Error: Unable to create '%s' for output." . PHP_EOL, $outName);
-            help();
-        }
+if ($outName != '') {
+    $outHandle = fopen($outName, 'w');
+    if ($outHandle === false) {
+        fclose($inHandle);
+        fprintf(STDERR, "Error: Unable to create '%s' for output." . PHP_EOL, $outName);
+        help();
     }
-    fseek($inHandle,0);
-    scan2($inHandle, $outHandle);
+    if (sizeof($requiredIDs) > 0) {
+        fseek($inHandle,0);
+        scan2($inHandle, $outHandle);
+    } else {
+        // No objects within bounding box. Short circuit second scan and
+        // just output an empty OSM file.
+        fprintf($outHandle, "%s".PHP_EOL, "<?xml version='1.0' encoding='UTF-8'?>");
+        fprintf($outHandle, "%s".PHP_EOL, "<osm version='0.6' upload='false' generator='JOSM'>");
+        fprintf($outHandle, "%s".PHP_EOL, "</osm>");
+    }
 }
 
 fclose($inHandle);

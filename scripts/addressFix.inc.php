@@ -222,10 +222,13 @@ $directionals = array(
 );
 
 $intermediates = array(
+    'Cv' => 'Cove',
     'Gl' => 'Glen',
     'Gln' => 'Glen',
+    'Grv' => 'Grove',
     'Hl' => 'Hill',
     'Mdw' => 'Meadow',
+    'Mdws' => 'Meadows',
     'Pa' => 'Pass',
     'Spgs' => 'Springs',
     'Vw' => 'View',
@@ -241,7 +244,6 @@ $suffixes = array(
     'Cir' => 'Circle',
     'Cr' => 'Circle',
     'Ct' => 'Court',
-    'Cv' => 'Cove',
     'Dr' => 'Drive',
     'Gr' => 'Grade',
     'Hw' => 'Highway',

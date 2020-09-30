@@ -20,6 +20,7 @@ function is_completed($chunkNumber) {
     $files = array(
         $completedDir . 'centroid.chunk' . $chunkNumber . '.osm',
         $completedDir . 'chunk' . $chunkNumber . '.centroid.osm',
+        $completedDir . 'chunk' . $chunkNumber . '.osm',
         $completedDir . 'chunk' . $chunkNumber . '.conflated.osm',
         $completedDir . 'chunk' . $chunkNumber . '.new.osm',
         $completedDir . 'conflated.chunk' . $chunkNumber . '.osm',
@@ -30,12 +31,13 @@ function is_completed($chunkNumber) {
         $rslt |= $e;
     }
 
-    if ($rslt) {
-        printf("    Chunk $chunkNumber has been completed." . PHP_EOL);
-    }
+    //if ($rslt) {
+    //    printf("    Chunk $chunkNumber has been completed." . PHP_EOL);
+    //}
     return $rslt;
 }
 
+/*
 $chunkCounterFile = 'chunkCounter.txt';
 $startChunk = file_get_contents($chunkCounterFile);
 if ($startChunk === false)
@@ -43,6 +45,9 @@ if ($startChunk === false)
 else
     $startChunk = (int)$startChunk;
 printf("Starting chunk is %s".PHP_EOL, $startChunk);
+*/
+
+$startChunk = 0;
 
 for ($s = $south; $s <= $north; $s+=$chunkSize) {
     for ($w = $west; $w <= $east; $w+=$chunkSize) {
@@ -51,7 +56,7 @@ for ($s = $south; $s <= $north; $s+=$chunkSize) {
             (!is_completed($chunkCount))) {
             $e = $w + $chunkSize;
             $n = $s + $chunkSize;
-            file_put_contents ($chunkCounterFile, $chunkCount);
+            //file_put_contents ($chunkCounterFile, $chunkCount);
             $osmFile = $outputDirectory . "/chunk" . $chunkCount . ".osm";
             $centroidFile = $outputDirectory . "/centroid.chunk" . $chunkCount . ".osm";
             $conflatedFile = $outputDirectory . "/conflated.chunk" . $chunkCount . ".osm";
@@ -59,17 +64,10 @@ for ($s = $south; $s <= $north; $s+=$chunkSize) {
             $cmd = "./scripts/Extract -b $w,$s,$e,$n -i $inputFileName -o $osmFile";
             //printf("'%s'".PHP_EOL, $cmd);
             exec($cmd);
-            //sleep(1);       // Hack to get file_exists to work???
-            //if (file_exists ( $osmFile )) {
-                $cmd = "./scripts/centroidIt -i $osmFile -o $centroidFile";
-                //printf("'%s'".PHP_EOL, $cmd);
-                exec($cmd);
 
-
-                //$cmd = "./scripts/conflate < $centroidFile > $conflatedFile";
-                //printf("'%s'".PHP_EOL, $cmd);
-                //exec($cmd);
-            //}
+            $cmd = "./scripts/centroidIt -i $osmFile -o $centroidFile";
+            //printf("'%s'".PHP_EOL, $cmd);
+            exec($cmd);
         }
     }
 }
