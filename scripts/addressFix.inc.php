@@ -222,14 +222,21 @@ $directionals = array(
 );
 
 $intermediates = array(
+    'Blf' => 'Bluff',
+    'Crk' => 'Creek',
     'Cv' => 'Cove',
     'Gl' => 'Glen',
     'Gln' => 'Glen',
     'Grv' => 'Grove',
     'Hl' => 'Hill',
+    'Holw' => 'Hollow',
+    'Lk' => 'Lake',
     'Mdw' => 'Meadow',
     'Mdws' => 'Meadows',
     'Pa' => 'Pass',
+    'Plz' => 'Plaza',
+    'Pne' => 'Pine',
+    'Riv' => 'River',
     'Spgs' => 'Springs',
     'Vw' => 'View',
 );
