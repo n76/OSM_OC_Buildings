@@ -227,6 +227,7 @@ $intermediates = array(
     'Cv' => 'Cove',
     'Gl' => 'Glen',
     'Gln' => 'Glen',
+    'Grn' => 'Green',
     'Grv' => 'Grove',
     'Hl' => 'Hill',
     'Holw' => 'Hollow',
@@ -237,6 +238,7 @@ $intermediates = array(
     'Plz' => 'Plaza',
     'Pne' => 'Pine',
     'Riv' => 'River',
+    'Smt' => 'Summit',
     'Spgs' => 'Springs',
     'Vw' => 'View',
 );
